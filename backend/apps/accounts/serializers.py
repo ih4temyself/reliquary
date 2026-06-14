@@ -22,7 +22,15 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
+    storage_used = serializers.IntegerField(read_only=True)
+
     class Meta:
         model = User
-        fields = ("id", "email", "display_name", "kdf_salt", "kdf_iterations", "date_joined")
-        read_only_fields = ("id", "email", "kdf_salt", "kdf_iterations", "date_joined")
+        fields = (
+            "id", "email", "display_name", "kdf_salt", "kdf_iterations",
+            "storage_used", "storage_quota", "date_joined",
+        )
+        read_only_fields = (
+            "id", "email", "kdf_salt", "kdf_iterations",
+            "storage_used", "storage_quota", "date_joined",
+        )

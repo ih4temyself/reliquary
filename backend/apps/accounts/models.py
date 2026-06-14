@@ -6,6 +6,7 @@ from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, Permis
 from django.db import models
 
 KDF_DEFAULT_ITERATIONS = 600_000
+DEFAULT_STORAGE_QUOTA = 15 * 1024 * 1024 * 1024
 
 
 def generate_kdf_salt():
@@ -45,6 +46,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     display_name = models.CharField(max_length=150, blank=True)
     kdf_salt = models.CharField(max_length=64, default=generate_kdf_salt, editable=False)
     kdf_iterations = models.PositiveIntegerField(default=KDF_DEFAULT_ITERATIONS)
+    storage_quota = models.BigIntegerField(default=DEFAULT_STORAGE_QUOTA)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     date_joined = models.DateTimeField(auto_now_add=True)
@@ -59,3 +61,11 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return self.email
+
+    @property
+    def storage_used(self):
+        from django.db.models import Sum
+
+        from apps.files.models import File
+
+        return File.objects.filter(owner=self).aggregate(total=Sum("encrypted_size"))["total"] or 0

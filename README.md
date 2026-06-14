@@ -20,7 +20,7 @@ reliquary/
 │       ├── accounts/       # custom email user, JWT auth
 │       ├── files/          # folders + encrypted files
 │       └── audit/          # audit log
-└── frontend/               # SvelteKit (planned)
+└── frontend/               # SvelteKit app (login, dashboard, upload, settings)
 ```
 
 ## Backend setup
@@ -51,3 +51,23 @@ API root: `http://localhost:8000/api/`
 | PATCH  | `/api/auth/me/`            | Update profile               |
 
 Access tokens live 15 minutes, refresh tokens 7 days.
+
+## Frontend setup
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+App: `http://localhost:5173` (expects the backend running on `:8000`).
+
+Implemented screens (from the Claude Design wireframes — dark + rust, Fira Mono / Zeyada):
+**Login/signup**, **Dashboard** (compact list, folders-first, grid toggle, multi-select +
+bulk actions, right-click menu, empty state), **Upload** modal (drag-drop + progress),
+**Settings** (profile + storage meter).
+
+The browser performs all encryption: on login it derives an AES-256-GCM key from the
+password via PBKDF2 (`src/lib/crypto.ts`) using the per-user salt from the API. Uploads are
+encrypted before leaving the page; downloads are decrypted in the browser. The key is held in
+memory only — a page refresh requires logging in again to re-derive it.

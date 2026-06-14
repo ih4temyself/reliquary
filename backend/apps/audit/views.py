@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db.models import Count, Sum
 from rest_framework import mixins, viewsets
 from rest_framework.response import Response
@@ -34,6 +35,8 @@ class DashboardView(APIView):
         return Response({
             "file_count": stats["count"] or 0,
             "total_size": stats["total_size"] or 0,
+            "storage_quota": request.user.storage_quota,
+            "max_upload_size": settings.MAX_UPLOAD_SIZE,
             "folder_count": Folder.objects.filter(owner=request.user).count(),
             "recent_activity": AuditLogSerializer(recent, many=True).data,
         })

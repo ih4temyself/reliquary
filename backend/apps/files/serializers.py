@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.db.models import Sum
 from rest_framework import serializers
 
 from .models import File, Folder
@@ -50,6 +51,17 @@ class FileUploadSerializer(serializers.ModelSerializer):
         if value is not None and value.owner_id != self.context["request"].user.id:
             raise serializers.ValidationError("Folder not found.")
         return value
+
+    def validate(self, attrs):
+        blob = attrs.get("blob")
+        user = self.context["request"].user
+        used = File.objects.filter(owner=user).aggregate(total=Sum("encrypted_size"))["total"] or 0
+        if blob and used + blob.size > user.storage_quota:
+            remaining = max(user.storage_quota - used, 0)
+            raise serializers.ValidationError(
+                {"blob": f"Storage quota exceeded. {remaining} bytes remaining."}
+            )
+        return attrs
 
     def create(self, validated_data):
         blob = validated_data.pop("blob")
