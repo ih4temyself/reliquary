@@ -1,7 +1,7 @@
 from django.http import FileResponse, Http404
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.parsers import FormParser, MultiPartParser
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 
 from apps.audit.models import AuditLog
@@ -35,10 +35,11 @@ class FolderViewSet(viewsets.ModelViewSet):
 class FileViewSet(
     mixins.ListModelMixin,
     mixins.RetrieveModelMixin,
+    mixins.UpdateModelMixin,
     mixins.DestroyModelMixin,
     viewsets.GenericViewSet,
 ):
-    parser_classes = [MultiPartParser, FormParser]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get_serializer_class(self):
         if self.action == "create":
@@ -61,6 +62,10 @@ class FileViewSet(
         record(request, AuditLog.Action.UPLOAD, file.id, file.name)
         return Response(FileSerializer(file, context=self.get_serializer_context()).data,
                         status=status.HTTP_201_CREATED)
+
+    def perform_update(self, serializer):
+        file = serializer.save()
+        record(self.request, AuditLog.Action.MOVE, file.id, file.name)
 
     def perform_destroy(self, instance):
         record(self.request, AuditLog.Action.DELETE, instance.id, instance.name)

@@ -1,14 +1,13 @@
 <script lang="ts">
-	import { untrack } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import { page } from '$app/state';
 	import Sidebar from '$lib/components/Sidebar.svelte';
-	import TopBar from '$lib/components/TopBar.svelte';
 	import Chip from '$lib/components/Chip.svelte';
 	import Button from '$lib/components/Button.svelte';
 	import Glyph from '$lib/components/Glyph.svelte';
 	import UploadModal from '$lib/components/UploadModal.svelte';
-	import PreviewModal from '$lib/components/PreviewModal.svelte';
 	import { auth, refreshUser } from '$lib/auth.svelte';
+	import { openPreview, registerReload } from '$lib/ui.svelte';
 	import {
 		listFiles,
 		listFolders,
@@ -30,7 +29,6 @@
 		Math.max((auth.user?.storage_quota ?? 0) - usedBytes, 0)
 	);
 	let view = $state<'list' | 'grid'>('list');
-	let search = $state('');
 
 	const VIEW_LABELS: Record<string, string> = {
 		all: 'All files',
@@ -39,6 +37,7 @@
 		documents: 'Documents'
 	};
 	const viewFilter = $derived(page.url.searchParams.get('view') ?? 'all');
+	const query = $derived(page.url.searchParams.get('q') ?? '');
 
 	let stack = $state<{ id: string | null; name: string }[]>([{ id: null, name: 'All files' }]);
 	let current = $derived(stack[stack.length - 1]);
@@ -46,10 +45,16 @@
 	let selected = $state<Set<string>>(new Set());
 	let menu = $state<{ id: string; x: number; y: number } | null>(null);
 	let showUpload = $state(false);
-	let preview = $state<FileItem | null>(null);
+
+	onMount(() => {
+		registerReload(load);
+		return () => registerReload(null);
+	});
 
 	let filtered = $derived(
-		files.filter((f) => f.name.toLowerCase().includes(search.toLowerCase()))
+		query
+			? files.filter((f) => f.name.toLowerCase().includes(query.toLowerCase()))
+			: files
 	);
 	let isEmpty = $derived(!loading && folders.length === 0 && filtered.length === 0);
 
@@ -72,7 +77,10 @@
 		menu = null;
 		selected = new Set();
 		try {
-			if (viewFilter === 'all') {
+			if (query) {
+				folders = [];
+				files = await listFiles();
+			} else if (viewFilter === 'all') {
 				const parent = current.id ?? 'root';
 				[folders, files] = await Promise.all([listFolders(parent), listFiles(parent)]);
 			} else {
@@ -90,8 +98,9 @@
 
 	$effect(() => {
 		const v = viewFilter;
+		const term = query;
 		untrack(() => {
-			stack = [{ id: null, name: VIEW_LABELS[v] ?? 'All files' }];
+			stack = [{ id: null, name: term ? `Results: "${term}"` : VIEW_LABELS[v] ?? 'All files' }];
 			load();
 		});
 	});
@@ -162,37 +171,35 @@
 <div class="app">
 	<Sidebar activeView={viewFilter} {usedBytes} totalBytes={auth.user?.storage_quota ?? undefined} />
 
-	<div class="main">
-		<TopBar bind:search>
-			{#snippet right()}
+	<div class="body">
+		<div class="toolbar">
+			<div class="crumbrow">
+				{#each stack as s, i (i)}
+					<button class="crumbbtn" class:cur={i === stack.length - 1} onclick={() => goCrumb(i)}>
+						{s.name}
+					</button>
+					{#if i < stack.length - 1}<span class="csep">›</span>{/if}
+				{/each}
+			</div>
+			<div class="actions">
 				<Button sm onclick={onNewFolder}>
 					<Glyph type="plus" size={13} color="var(--wf-ink)" /> New folder
 				</Button>
 				<Button sm primary onclick={() => (showUpload = true)}>Upload</Button>
-			{/snippet}
-		</TopBar>
-
-		<div class="body">
-			<div class="toolbar">
-				<div class="crumbrow">
-					{#each stack as s, i (i)}
-						<button class="crumbbtn" class:cur={i === stack.length - 1} onclick={() => goCrumb(i)}>
-							{s.name}
-						</button>
-						{#if i < stack.length - 1}<span class="csep">›</span>{/if}
-					{/each}
-				</div>
-				<div class="toggle">
-					<Chip active={view === 'list'} onclick={() => (view = 'list')}>List</Chip>
-					<Chip active={view === 'grid'} onclick={() => (view = 'grid')}>Grid</Chip>
-				</div>
 			</div>
+		</div>
 
+		<div class="subbar">
 			<div class="sorts">
 				<Chip active>Name ↓</Chip>
 				<Chip>Type</Chip>
 				<Chip>Modified</Chip>
 			</div>
+			<div class="toggle">
+				<Chip active={view === 'list'} onclick={() => (view = 'list')}>List</Chip>
+				<Chip active={view === 'grid'} onclick={() => (view = 'grid')}>Grid</Chip>
+			</div>
+		</div>
 
 			{#if selected.size > 0}
 				<div class="bulkbar">
@@ -253,7 +260,7 @@
 									{selected.has(f.id) ? '✓' : ''}
 								</button>
 								<Glyph type={iconFor(f.name)} size={18} />
-								<button class="name" onclick={() => (preview = f)}>{f.name}</button>
+								<button class="name" onclick={() => openPreview(f)}>{f.name}</button>
 								<span class="meta">{fmtDate(f.updated_at)}</span>
 								<span class="meta">{fmtSize(f.encrypted_size)}</span>
 								<button class="dots" onclick={(e) => onRowMenu(e, f.id)} aria-label="Menu">
@@ -271,7 +278,7 @@
 							</button>
 						{/each}
 						{#each filtered as f (f.id)}
-							<button class="tile" onclick={() => (preview = f)}>
+							<button class="tile" onclick={() => openPreview(f)}>
 								<div class="thumb">{f.name.split('.').pop()}</div>
 								<span class="tname">{f.name}</span>
 							</button>
@@ -280,12 +287,11 @@
 				{/if}
 			</div>
 		</div>
-	</div>
 </div>
 
 {#if menu && menuFile}
 	<div class="ctx" style="left:{menu.x}px;top:{menu.y}px">
-		<button onclick={() => (preview = menuFile)}><Glyph type="file" size={15} color="var(--wf-faint)" />Open</button>
+		<button onclick={() => menuFile && openPreview(menuFile)}><Glyph type="file" size={15} color="var(--wf-faint)" />Open</button>
 		<button onclick={() => menuFile && downloadDecrypted(menuFile)}><Glyph type="file" size={15} color="var(--wf-faint)" />Download</button>
 		<button disabled><Glyph type="square" size={15} color="var(--wf-faint)" />Rename</button>
 		<button disabled><Glyph type="folder" size={15} color="var(--wf-faint)" />Move to…</button>
@@ -306,30 +312,13 @@
 	/>
 {/if}
 
-{#if preview}
-	<PreviewModal
-		item={preview}
-		onclose={() => (preview = null)}
-		ondownload={(f) => downloadDecrypted(f)}
-		ondelete={(f) => {
-			preview = null;
-			onDelete(f.id);
-		}}
-	/>
-{/if}
-
 <style>
 	.app {
 		display: flex;
-		height: 100vh;
+		flex: 1;
+		min-height: 0;
 		background: var(--wf-paper);
 		color: var(--wf-ink);
-	}
-	.main {
-		flex: 1;
-		display: flex;
-		flex-direction: column;
-		min-width: 0;
 	}
 	.body {
 		padding: 16px 22px;
@@ -337,9 +326,20 @@
 		flex-direction: column;
 		gap: 14px;
 		flex: 1;
+		min-width: 0;
 		min-height: 0;
 	}
 	.toolbar {
+		display: flex;
+		align-items: center;
+		gap: 14px;
+	}
+	.actions {
+		margin-left: auto;
+		display: flex;
+		gap: 8px;
+	}
+	.subbar {
 		display: flex;
 		align-items: center;
 		gap: 14px;

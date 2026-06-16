@@ -24,6 +24,16 @@ class RegisterSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     storage_used = serializers.IntegerField(read_only=True)
 
+    def validate_display_name(self, value):
+        cleaned = value.strip()
+        if not cleaned:
+            raise serializers.ValidationError("Name is required.")
+        if cleaned.lower() == "unnamed":
+            raise serializers.ValidationError("“Unnamed” isn’t allowed — pick a real name.")
+        if len(cleaned) < 2:
+            raise serializers.ValidationError("Name must be at least 2 characters.")
+        return cleaned
+
     class Meta:
         model = User
         fields = (

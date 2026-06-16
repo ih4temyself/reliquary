@@ -9,6 +9,7 @@ class AuditLog(models.Model):
         UPLOAD = "upload", "Upload"
         DOWNLOAD = "download", "Download"
         DELETE = "delete", "Delete"
+        MOVE = "move", "Move"
         FOLDER_CREATE = "folder_create", "Folder created"
         FOLDER_DELETE = "folder_delete", "Folder deleted"
 
