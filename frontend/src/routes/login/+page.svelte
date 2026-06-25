@@ -1,9 +1,11 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { auth, login, register } from '$lib/auth.svelte';
+	import { env } from '$env/dynamic/public';
+	import { auth, login, register, loginWithGoogle } from '$lib/auth.svelte';
 	import { ApiError } from '$lib/api';
 	import Button from '$lib/components/Button.svelte';
+	import EncryptionModal from '$lib/components/EncryptionModal.svelte';
 
 	let tab = $state<'login' | 'signup'>('login');
 	let email = $state('');
@@ -11,10 +13,55 @@
 	let displayName = $state('');
 	let busy = $state(false);
 	let error = $state('');
+	let encMode = $state<'setup' | 'unlock' | null>(null);
+
+	const googleClientId = env.PUBLIC_GOOGLE_CLIENT_ID ?? '';
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	let tokenClient: any = null;
 
 	onMount(() => {
 		if (auth.user) goto('/files', { replaceState: true });
 	});
+
+	function afterAuth() {
+		if (auth.key) {
+			goto('/files', { replaceState: true });
+		} else {
+			encMode = auth.user?.has_encryption ? 'unlock' : 'setup';
+		}
+	}
+
+	function googleSignIn() {
+		error = '';
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		const g = (window as any).google;
+		if (!googleClientId || !g?.accounts?.oauth2) {
+			error = 'Google sign-in is unavailable.';
+			return;
+		}
+		if (!tokenClient) {
+			tokenClient = g.accounts.oauth2.initTokenClient({
+				client_id: googleClientId,
+				scope: 'openid email profile',
+				callback: async (resp: { access_token?: string; error?: string }) => {
+					if (!resp.access_token) {
+						error = 'Google sign-in was cancelled.';
+						return;
+					}
+					busy = true;
+					try {
+						await loginWithGoogle(resp.access_token);
+						afterAuth();
+					} catch (err) {
+						error = err instanceof ApiError ? 'Google sign-in failed.' : (err as Error).message;
+					} finally {
+						busy = false;
+					}
+				}
+			});
+		}
+		tokenClient.requestAccessToken();
+	}
 
 	async function submit(e: SubmitEvent) {
 		e.preventDefault();
@@ -94,10 +141,19 @@
 			</Button>
 
 			<div class="divider"><span>or</span></div>
-			<Button disabled>Continue with Google</Button>
+			<Button onclick={googleSignIn} disabled={busy || !googleClientId}>
+				<span class="gmark">G</span> Continue with Google
+			</Button>
+			{#if !googleClientId}
+				<p class="hint">Google sign-in isn’t configured.</p>
+			{/if}
 		</form>
 	</div>
 </div>
+
+{#if encMode}
+	<EncryptionModal mode={encMode} onsuccess={() => goto('/files', { replaceState: true })} />
+{/if}
 
 <style>
 	.screen {
@@ -206,6 +262,23 @@
 		margin: 0;
 		font-size: 12px;
 		color: var(--wf-danger);
+	}
+	.hint {
+		margin: 0;
+		font-size: 11px;
+		color: var(--wf-faint);
+		text-align: center;
+	}
+	.gmark {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 16px;
+		height: 16px;
+		border: 2px solid currentColor;
+		border-radius: 50%;
+		font-size: 10px;
+		font-weight: 700;
 	}
 	.divider {
 		display: flex;

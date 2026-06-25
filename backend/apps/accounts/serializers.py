@@ -21,8 +21,17 @@ class RegisterSerializer(serializers.ModelSerializer):
         )
 
 
+class EncryptionSetupSerializer(serializers.Serializer):
+    enc_verifier = serializers.CharField()
+    enc_verifier_nonce = serializers.CharField()
+
+
 class UserSerializer(serializers.ModelSerializer):
     storage_used = serializers.IntegerField(read_only=True)
+    has_encryption = serializers.SerializerMethodField()
+
+    def get_has_encryption(self, obj):
+        return bool(obj.enc_verifier)
 
     def validate_display_name(self, value):
         cleaned = value.strip()
@@ -38,9 +47,11 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = (
             "id", "email", "display_name", "kdf_salt", "kdf_iterations",
+            "has_encryption", "enc_verifier", "enc_verifier_nonce",
             "storage_used", "storage_quota", "date_joined",
         )
         read_only_fields = (
             "id", "email", "kdf_salt", "kdf_iterations",
+            "has_encryption", "enc_verifier", "enc_verifier_nonce",
             "storage_used", "storage_quota", "date_joined",
         )

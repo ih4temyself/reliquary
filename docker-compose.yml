@@ -27,6 +27,7 @@ services:
       DATABASE_URL: postgres://reliquary:reliquary@db:5432/reliquary
       CORS_ALLOWED_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
       MAX_UPLOAD_SIZE: "1073741824"
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-239880984549-0v5ev18c0hu9u8tqcv5gavkmtg0223fr.apps.googleusercontent.com}
     ports:
       - "8000:8000"
     volumes:
@@ -41,6 +42,7 @@ services:
     container_name: reliquary-frontend
     environment:
       VITE_USE_POLLING: "1"
+      PUBLIC_GOOGLE_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-239880984549-0v5ev18c0hu9u8tqcv5gavkmtg0223fr.apps.googleusercontent.com}
     ports:
       - "5173:5173"
     volumes:

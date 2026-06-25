@@ -46,6 +46,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     display_name = models.CharField(max_length=150, blank=True)
     kdf_salt = models.CharField(max_length=64, default=generate_kdf_salt, editable=False)
     kdf_iterations = models.PositiveIntegerField(default=KDF_DEFAULT_ITERATIONS)
+    enc_verifier = models.TextField(blank=True, default="")
+    enc_verifier_nonce = models.CharField(max_length=64, blank=True, default="")
     storage_quota = models.BigIntegerField(default=DEFAULT_STORAGE_QUOTA)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)

@@ -7,6 +7,7 @@
 	import TopBar from '$lib/components/TopBar.svelte';
 	import PreviewModal from '$lib/components/PreviewModal.svelte';
 	import MovePicker from '$lib/components/MovePicker.svelte';
+	import EncryptionModal from '$lib/components/EncryptionModal.svelte';
 
 	let { children } = $props();
 
@@ -43,6 +44,10 @@
 
 	{#if ui.moveTarget}
 		<MovePicker item={ui.moveTarget} />
+	{/if}
+
+	{#if auth.user.has_encryption && !auth.key}
+		<EncryptionModal mode="unlock" />
 	{/if}
 {/if}
 
